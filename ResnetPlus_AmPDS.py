@@ -57,8 +57,8 @@ T = T / 30.
 # the initial value for iter_weekday corresponds to the first day of the dataset
 # 2012/04/02 was a Monday
 iter_weekday = 1
-weekday = np.zeros((24 * 1747,))
-for i in range(1747):
+weekday = np.zeros((24 * 727,))
+for i in range(727):
     mod = np.mod(iter_weekday, 7)
     for j in range(24):
         # identify whether this day is a weekday or weekend
