@@ -18,8 +18,8 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from sklearn.metrics import mean_squared_error
-from sklearn.metrics import mean_absolute_error
+# from sklearn.metrics import mean_squared_error
+# from sklearn.metrics import mean_absolute_error
 
 # from pandas import DataFrame, Series
 parse_dates = ['date']
@@ -632,14 +632,14 @@ if VAL:
     val_loss_up = val_loss_mean + val_loss_std
     val_loss_down = val_loss_mean - val_loss_std
 
-    x = range(700)
+    x = range(1000)
 
     plt.figure(figsize=(5, 4))
     plt.plot(x, loss_mean, color='Green')
     plt.fill_between(x, loss_up, loss_down, color='LightGreen', alpha=0.7)
     plt.plot(val_loss_mean, color='RoyalBlue')
     plt.fill_between(x, val_loss_up, val_loss_down, color='LightSkyBlue', alpha=0.7)
-    plt.axis([200, 700, 1, 2.5])
+    plt.axis([200, 1000, 1, 2.5])
     plt.show()
 else:
 
@@ -664,10 +664,10 @@ else:
     loss_up = loss_mean + loss_std
     loss_down = loss_mean - loss_std
 
-    x = range(700)
+    x = range(1000)
 
     plt.figure(figsize=(5, 4))
     plt.plot(x, loss_mean, color='Green')
     plt.fill_between(x, loss_up, loss_down, color='LightGreen', alpha=0.7)
-    plt.axis([200, 700, 1, 2.5])
+    plt.axis([200, 1000, 1, 2.5])
     plt.show()
