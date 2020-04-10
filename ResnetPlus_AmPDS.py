@@ -5,15 +5,14 @@
 @File ：ResnetPlus_AmPDS.py
 """
 
-
 ################################################################################
-## Keras implementation of day-ahead prediction of the ISO-NE hourly demand data.
+## Keras implementation of day-ahead prediction of the AmPDS hourly demand data.
 
 # -----------------------------------------------------------------------------
 # load original data file
 # modification of the data loading procedure is needed if you have your own dataset
-# In this case, we use our own dataset 'data.csv', which contains the data from
-# 1988/1/1 to 1992/10/12
+# In this case, we use our own dataset 'data_AmPDS.csv', which contains the data from
+# 2012/4/2 to 2014/3/29
 
 import h5py
 import matplotlib.pyplot as plt
@@ -25,7 +24,6 @@ from sklearn.metrics import mean_absolute_error
 # from pandas import DataFrame, Series
 parse_dates = ['date']
 df = pd.read_csv('data_AmPDS.csv', parse_dates=parse_dates, index_col='date')
-
 
 # 1. get the maximum and minimum demands in 0-24 clock intervals
 # 2. get the daily demand and temperature values
@@ -48,9 +46,9 @@ for i in range(len(D)):
 # normalization based on peak values
 # max demand = 333540
 # max temperature = 27.6
-D_max = D_max / 330000.
-D_min = D_min / 330000.
-D = D / 330000.
+D_max = D_max / 300000.
+D_min = D_min / 300000.
+D = D / 300000.
 T = T / 30.
 
 # add weekday info to the dataset
@@ -71,9 +69,9 @@ for i in range(727):
 # add season and festival info to the dataset
 import datetime
 
-# the length of the train dataset is 1016, the first date is 1988/1/1
+# the length of the train dataset is 1016, the first date is 2012/04/02
 # the length of the test dataset is
-# there are 1747 days in the dataset
+# there are 727 days in the dataset
 iter_date = datetime.date(2012, 4, 2)
 season = np.zeros((24 * 727,))
 festival = np.zeros((24 * 727,))
@@ -98,7 +96,7 @@ for i in range(727):
         # we only consider Independence day, Thanksgiving Day and Christmas Eve
         if (month == 7) and (day == 4):
             festival[i * 24 + j] = 1
-        #weekday()函数的返回值0-6 分别对应周一到周日 感恩节是11月的第四个星期四，所以weekday的返回值为5
+        # weekday()函数的返回值0-6 分别对应周一到周日 感恩节是11月的第四个星期四，所以weekday的返回值为5
         if (month == 11) and (iter_date.weekday() == 5) and (day + 7 > 30):
             festival[i * 24 + j] = 1
         if (month == 12) and (day == 24):
@@ -138,8 +136,8 @@ def data_split(D, T, D_max, D_min, season, weekday, festival, num_train_days, va
         x_21_D.append(D[index_x_21])
         x_21_T.append(T[index_x_21])
 
-        # multiple demand values every week within one months
-        index_x_22 = [i - 168, i - 336, i - 504, i - 672, i-840, i-1008, i-1176, i-1344]
+        # multiple demand values every week within two months
+        index_x_22 = [i - 168, i - 336, i - 504, i - 672, i - 840, i - 1008, i - 1176, i - 1344]
         x_22_D.append(D[index_x_22])
         x_22_T.append(T[index_x_22])
 
@@ -224,8 +222,8 @@ def data_split(D, T, D_max, D_min, season, weekday, festival, num_train_days, va
 # num_pre_days: the number of days we need before we can get the first sample, in this case: 6*28 days
 num_pre_days = 84
 num_days = 727
-num_test_days = 88
-num_train_days = 555
+num_test_days = 365
+num_train_days = 278
 num_data_points = num_days * 24
 num_days_start = num_days - num_pre_days - num_test_days - num_train_days
 start_data_point = num_days_start * 24
@@ -309,7 +307,7 @@ def get_basic_structure(hour, input_Dd, input_Dw, input_Dm, input_Dr, input_Td, 
     get the module with the basic structure.
     output_pre is used to replace the recent 24-hour inputs with the outputs of basic-structure modules of previous hours.
     '''
-    num_dense = 10
+    num_dense = 20
 
     dense_Dd = Dense(num_dense, activation='selu', kernel_initializer='lecun_normal')(input_Dd)
     dense_Dw = Dense(num_dense, activation='selu', kernel_initializer='lecun_normal')(input_Dw)
@@ -328,8 +326,8 @@ def get_basic_structure(hour, input_Dd, input_Dw, input_Dm, input_Dr, input_Td, 
     dense_m = Dense(num_dense, activation='selu', kernel_initializer='lecun_normal')(concat_m)
 
     concat_date_info = concatenate([input_season, input_weekday])
-    dense_concat_date_info_1 = Dense(5, activation='selu', kernel_initializer='lecun_normal')(concat_date_info)
-    dense_concat_date_info_2 = Dense(5, activation='selu', kernel_initializer='lecun_normal')(concat_date_info)
+    dense_concat_date_info_1 = Dense(10, activation='selu', kernel_initializer='lecun_normal')(concat_date_info)
+    dense_concat_date_info_2 = Dense(10, activation='selu', kernel_initializer='lecun_normal')(concat_date_info)
 
     concat_FC2 = concatenate([dense_d, dense_w, dense_m, dense_concat_date_info_1, input_festival])
     dense_FC2 = Dense(num_dense, activation='selu', kernel_initializer='lecun_normal')(concat_FC2)
@@ -446,7 +444,7 @@ input_1 = output_pre
 input_2 = output_pre
 output_list = [output_pre]
 
-num_resnetplus_layer = 20
+num_resnetplus_layer = 30
 
 for i in range(num_resnetplus_layer):
     output_res_ave, output_list = resnetplus_layer(input_1, input_2, output_list)
@@ -539,7 +537,7 @@ def shuffle_weights(model, weights=None):
 
 NUM_REPEAT = 5
 NUM_SNAPSHOTS = 3
-NUM_TEST_DAYS = 88
+NUM_TEST_DAYS = 365
 
 TRAIN = 1  # set TRAIN to 0 if you already have the weights in the directory.
 if TRAIN:
@@ -555,7 +553,7 @@ if TRAIN:
         shuffle_weights(model)
 
         history_1 = model.fit(X_train_fit, Y_train_fit,
-                              epochs=600, batch_size=BATCH_SIZE, validation_data=None)
+                              epochs=900, batch_size=BATCH_SIZE, validation_data=None)
 
         model.save_weights('complete' + str(i + 1) + '1_weights.h5')
         pred_1 = model.predict(X_test_pred)
@@ -575,7 +573,6 @@ if TRAIN:
         pred_3 = model.predict(X_test_pred)
         pred_eval_3 = pred_3.reshape(24 * NUM_TEST_DAYS)
 
-
         pred_list.append([pred_eval_1, pred_eval_2, pred_eval_3])
         history_list.append([history_1, history_2, history_3])
 
@@ -592,8 +589,7 @@ pred_eval = np.mean(p, axis=0)
 Y_test_eval = np.array(Y_test).transpose().reshape(24 * NUM_TEST_DAYS)
 mape = np.mean(np.divide(np.abs(Y_test_eval - pred_eval), Y_test_eval))
 mae = np.mean(np.abs(Y_test_eval - pred_eval))
-rmse = np.sqrt(np.mean(np.square(pred_eval-Y_test_eval)))
-
+rmse = np.sqrt(np.mean(np.square(pred_eval - Y_test_eval)))
 
 print('mape:')
 print(mape)
@@ -638,7 +634,7 @@ if VAL:
 
     x = range(700)
 
-    plt.figure(figsize=(6, 4))
+    plt.figure(figsize=(5, 4))
     plt.plot(x, loss_mean, color='Green')
     plt.fill_between(x, loss_up, loss_down, color='LightGreen', alpha=0.7)
     plt.plot(val_loss_mean, color='RoyalBlue')
@@ -670,7 +666,7 @@ else:
 
     x = range(700)
 
-    plt.figure(figsize=(6, 4))
+    plt.figure(figsize=(5, 4))
     plt.plot(x, loss_mean, color='Green')
     plt.fill_between(x, loss_up, loss_down, color='LightGreen', alpha=0.7)
     plt.axis([200, 700, 1, 2.5])
