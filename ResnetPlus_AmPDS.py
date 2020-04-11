@@ -23,7 +23,7 @@ import pandas as pd
 
 # from pandas import DataFrame, Series
 parse_dates = ['date']
-df = pd.read_csv('data_AmPDS.csv', parse_dates=parse_dates, index_col='date')
+df = pd.read_csv('data_AmPDS2.csv', parse_dates=parse_dates, index_col='date')
 
 # 1. get the maximum and minimum demands in 0-24 clock intervals
 # 2. get the daily demand and temperature values
@@ -44,12 +44,12 @@ for i in range(len(D)):
     D_min[i] = D_min_daily[n_day]
 
 # normalization based on peak values
-# max demand = 333540
-# max temperature = 27.6
-D_max = D_max / 300000.
-D_min = D_min / 300000.
-D = D / 300000.
-T = T / 30.
+# max demand = 42000
+# max temperature = 81.76
+D_max = D_max / 42000.
+D_min = D_min / 42000.
+D = D / 42000.
+T = T / 82.
 
 # add weekday info to the dataset
 # the initial value for iter_weekday corresponds to the first day of the dataset
@@ -222,8 +222,8 @@ def data_split(D, T, D_max, D_min, season, weekday, festival, num_train_days, va
 # num_pre_days: the number of days we need before we can get the first sample, in this case: 6*28 days
 num_pre_days = 84
 num_days = 727
-num_test_days = 365
-num_train_days = 278
+num_test_days = 300
+num_train_days = 343
 num_data_points = num_days * 24
 num_days_start = num_days - num_pre_days - num_test_days - num_train_days
 start_data_point = num_days_start * 24
@@ -307,7 +307,7 @@ def get_basic_structure(hour, input_Dd, input_Dw, input_Dm, input_Dr, input_Td, 
     get the module with the basic structure.
     output_pre is used to replace the recent 24-hour inputs with the outputs of basic-structure modules of previous hours.
     '''
-    num_dense = 20
+    num_dense = 10
 
     dense_Dd = Dense(num_dense, activation='selu', kernel_initializer='lecun_normal')(input_Dd)
     dense_Dw = Dense(num_dense, activation='selu', kernel_initializer='lecun_normal')(input_Dw)
@@ -326,8 +326,8 @@ def get_basic_structure(hour, input_Dd, input_Dw, input_Dm, input_Dr, input_Td, 
     dense_m = Dense(num_dense, activation='selu', kernel_initializer='lecun_normal')(concat_m)
 
     concat_date_info = concatenate([input_season, input_weekday])
-    dense_concat_date_info_1 = Dense(10, activation='selu', kernel_initializer='lecun_normal')(concat_date_info)
-    dense_concat_date_info_2 = Dense(10, activation='selu', kernel_initializer='lecun_normal')(concat_date_info)
+    dense_concat_date_info_1 = Dense(5, activation='selu', kernel_initializer='lecun_normal')(concat_date_info)
+    dense_concat_date_info_2 = Dense(5, activation='selu', kernel_initializer='lecun_normal')(concat_date_info)
 
     concat_FC2 = concatenate([dense_d, dense_w, dense_m, dense_concat_date_info_1, input_festival])
     dense_FC2 = Dense(num_dense, activation='selu', kernel_initializer='lecun_normal')(concat_FC2)
@@ -537,7 +537,7 @@ def shuffle_weights(model, weights=None):
 
 NUM_REPEAT = 5
 NUM_SNAPSHOTS = 3
-NUM_TEST_DAYS = 365
+NUM_TEST_DAYS = 300
 
 TRAIN = 1  # set TRAIN to 0 if you already have the weights in the directory.
 if TRAIN:
