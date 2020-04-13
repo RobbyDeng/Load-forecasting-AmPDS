@@ -608,7 +608,7 @@ predict = np.around(pred_eval, decimals=5)
 predict_array = predict.astype(type('float', (float,), {}))
 
 test = np.around(Y_test_eval, decimals=5)
-test_array = predict.astype(type('float', (float,), {}))
+test_array = test.astype(type('float', (float,), {}))
 
 #画图
 timeData = []
