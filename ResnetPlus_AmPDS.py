@@ -18,12 +18,18 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-# from sklearn.metrics import mean_squared_error
-# from sklearn.metrics import mean_absolute_error
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+import pyecharts.options as opts
+from pyecharts.charts import Line, Grid
+import webbrowser
+
 
 # from pandas import DataFrame, Series
 parse_dates = ['date']
-df = pd.read_csv('data_AmPDS2.csv', parse_dates=parse_dates, index_col='date')
+df = pd.read_csv('data_AmPDS3.csv', parse_dates=parse_dates, index_col='date')
+df1 = pd.read_csv('data_AmPDS3.csv')
+
 
 # 1. get the maximum and minimum demands in 0-24 clock intervals
 # 2. get the daily demand and temperature values
@@ -46,9 +52,9 @@ for i in range(len(D)):
 # normalization based on peak values
 # max demand = 42000
 # max temperature = 81.76
-D_max = D_max / 42000.
-D_min = D_min / 42000.
-D = D / 42000.
+D_max = D_max / 330000.
+D_min = D_min / 330000.
+D = D / 330000.
 T = T / 82.
 
 # add weekday info to the dataset
@@ -222,8 +228,8 @@ def data_split(D, T, D_max, D_min, season, weekday, festival, num_train_days, va
 # num_pre_days: the number of days we need before we can get the first sample, in this case: 6*28 days
 num_pre_days = 84
 num_days = 727
-num_test_days = 300
-num_train_days = 343
+num_test_days = 227
+num_train_days = 416
 num_data_points = num_days * 24
 num_days_start = num_days - num_pre_days - num_test_days - num_train_days
 start_data_point = num_days_start * 24
@@ -307,7 +313,7 @@ def get_basic_structure(hour, input_Dd, input_Dw, input_Dm, input_Dr, input_Td, 
     get the module with the basic structure.
     output_pre is used to replace the recent 24-hour inputs with the outputs of basic-structure modules of previous hours.
     '''
-    num_dense = 10
+    num_dense = 20
 
     dense_Dd = Dense(num_dense, activation='selu', kernel_initializer='lecun_normal')(input_Dd)
     dense_Dw = Dense(num_dense, activation='selu', kernel_initializer='lecun_normal')(input_Dw)
@@ -326,8 +332,8 @@ def get_basic_structure(hour, input_Dd, input_Dw, input_Dm, input_Dr, input_Td, 
     dense_m = Dense(num_dense, activation='selu', kernel_initializer='lecun_normal')(concat_m)
 
     concat_date_info = concatenate([input_season, input_weekday])
-    dense_concat_date_info_1 = Dense(5, activation='selu', kernel_initializer='lecun_normal')(concat_date_info)
-    dense_concat_date_info_2 = Dense(5, activation='selu', kernel_initializer='lecun_normal')(concat_date_info)
+    dense_concat_date_info_1 = Dense(10, activation='selu', kernel_initializer='lecun_normal')(concat_date_info)
+    dense_concat_date_info_2 = Dense(10, activation='selu', kernel_initializer='lecun_normal')(concat_date_info)
 
     concat_FC2 = concatenate([dense_d, dense_w, dense_m, dense_concat_date_info_1, input_festival])
     dense_FC2 = Dense(num_dense, activation='selu', kernel_initializer='lecun_normal')(concat_FC2)
@@ -537,7 +543,7 @@ def shuffle_weights(model, weights=None):
 
 NUM_REPEAT = 5
 NUM_SNAPSHOTS = 3
-NUM_TEST_DAYS = 300
+NUM_TEST_DAYS = 227
 
 TRAIN = 1  # set TRAIN to 0 if you already have the weights in the directory.
 if TRAIN:
@@ -553,23 +559,23 @@ if TRAIN:
         shuffle_weights(model)
 
         history_1 = model.fit(X_train_fit, Y_train_fit,
-                              epochs=900, batch_size=BATCH_SIZE, validation_data=None)
+                              epochs=600, batch_size=BATCH_SIZE, validation_data=None)
 
-        model.save_weights('complete' + str(i + 1) + '1_weights.h5')
+        model.save_weights('complete' + str(i + 1) + '1_weights_ampds.h5')
         pred_1 = model.predict(X_test_pred)
         pred_eval_1 = pred_1.reshape(24 * NUM_TEST_DAYS)
 
         history_2 = model.fit(X_train_fit, Y_train_fit,
                               epochs=50, batch_size=BATCH_SIZE, validation_data=None)
 
-        model.save_weights('complete' + str(i + 1) + '2_weights.h5')
+        model.save_weights('complete' + str(i + 1) + '2_weights_ampds.h5')
         pred_2 = model.predict(X_test_pred)
         pred_eval_2 = pred_2.reshape(24 * NUM_TEST_DAYS)
 
         history_3 = model.fit(X_train_fit, Y_train_fit,
                               epochs=50, batch_size=BATCH_SIZE, validation_data=None)
 
-        model.save_weights('complete' + str(i + 1) + '3_weights.h5')
+        model.save_weights('complete' + str(i + 1) + '3_weights_ampds.h5')
         pred_3 = model.predict(X_test_pred)
         pred_eval_3 = pred_3.reshape(24 * NUM_TEST_DAYS)
 
@@ -582,7 +588,7 @@ if TRAIN:
 p = np.zeros((NUM_REPEAT * NUM_SNAPSHOTS, 24 * NUM_TEST_DAYS))
 for i in range(NUM_REPEAT):
     for j in range(NUM_SNAPSHOTS):
-        model.load_weights('complete' + str(i + 1) + str(j + 1) + '_weights.h5')
+        model.load_weights('complete' + str(i + 1) + str(j + 1) + '_weights_ampds.h5')
         pred = model.predict(X_test_pred)
         p[i * NUM_SNAPSHOTS + j, :] = pred.reshape(24 * NUM_TEST_DAYS)
 pred_eval = np.mean(p, axis=0)
@@ -598,76 +604,186 @@ print(rmse)
 print('mae:')
 print(mae)
 
-VAL = False  # only used for the plotting section hereafter
-# You can set the proportion of validation data in the training phase
-# or split the data into training and validation sets in advance
+predict = np.around(pred_eval, decimals=5)
+predict_array = predict.astype(type('float', (float,), {}))
 
-if VAL:
-    def get_curve_data(history):
-        loss = []
-        val_loss = []
-        for history_item in history:
-            loss = loss + history_item.history['loss']
-            val_loss = val_loss + history_item.history['val_loss']
-        return (np.array(loss), np.array(val_loss))
+test = np.around(Y_test_eval, decimals=5)
+test_array = predict.astype(type('float', (float,), {}))
+
+#画图
+timeData = []
+for i in range((num_pre_days+num_train_days)*24, num_days*24):
+    timeData.append(str(df1['date'][i])+' '+str(df1['hour'][i])+':00')
+timeData = [d.replace("2013/", "13/") for d in timeData]
+timeData = [d.replace("2014/", "14/") for d in timeData]
+l1 = (
+    Line()
+    .add_xaxis(xaxis_data=timeData)
+    .add_yaxis(
+        series_name="预测值",
+        y_axis=predict_array,
+        symbol_size=8,
+        is_hover_animation=False,
+        label_opts=opts.LabelOpts(is_show=False),
+        linestyle_opts=opts.LineStyleOpts(width=0.5),
+        is_smooth=True,
+    )
+    .set_global_opts(
+        title_opts=opts.TitleOpts(
+            title="电量预测值与实际值对比图", subtitle="数据来自AMPds2", pos_left="center"
+        ),
+        tooltip_opts=opts.TooltipOpts(trigger="axis"),
+        axispointer_opts=opts.AxisPointerOpts(
+            is_show=True, link=[{"xAxisIndex": "all"}]
+        ),
+        datazoom_opts=[
+            opts.DataZoomOpts(
+                is_show=True,
+                is_realtime=True,
+                start_value=30,
+                end_value=80,
+                xaxis_index=[0, 1],
+            )
+        ],
+        xaxis_opts=opts.AxisOpts(
+            type_="category",
+            boundary_gap=False,
+            axisline_opts=opts.AxisLineOpts(is_on_zero=True),
+        ),
+        yaxis_opts=opts.AxisOpts(max_=1, name="用电量"),
+        legend_opts=opts.LegendOpts(pos_left="left"),
+        toolbox_opts=opts.ToolboxOpts(
+            is_show=True,
+            feature={
+                "dataZoom": {"yAxisIndex": "none"},
+                "restore": {},
+                "saveAsImage": {},
+            },
+        ),
+    )
+)
+
+l2 = (
+    Line()
+    .add_xaxis(xaxis_data=timeData)
+    .add_yaxis(
+        series_name="实际值",
+        y_axis=test_array,
+        xaxis_index=1,
+        yaxis_index=1,
+        symbol_size=8,
+        is_hover_animation=False,
+        label_opts=opts.LabelOpts(is_show=False),
+        linestyle_opts=opts.LineStyleOpts(width=0.5),
+        is_smooth=True,
+    )
+    .set_global_opts(
+        axispointer_opts=opts.AxisPointerOpts(
+            is_show=True, link=[{"xAxisIndex": "all"}]
+        ),
+        tooltip_opts=opts.TooltipOpts(trigger="axis"),
+        xaxis_opts=opts.AxisOpts(
+            grid_index=1,
+            type_="category",
+            boundary_gap=False,
+            axisline_opts=opts.AxisLineOpts(is_on_zero=True),
+            position="top",
+        ),
+        datazoom_opts=[
+            opts.DataZoomOpts(
+                is_realtime=True,
+                type_="inside",
+                start_value=30,
+                end_value=70,
+                xaxis_index=[0, 1],
+            )
+        ],
+        yaxis_opts=opts.AxisOpts(max_=1, name="用电量"),
+        legend_opts=opts.LegendOpts(pos_left="7%"),
+    )
+)
 
 
-    loss_list = []
-    val_loss_list = []
-    for history in history_list:
-        loss_once, val_loss_once = get_curve_data(history)
-        loss_list.append(loss_once)
-        val_loss_list.append(val_loss_once)
 
-    loss = np.array(loss_list)
-    val_loss = np.array(val_loss_list)
+(
+    Grid(init_opts=opts.InitOpts(width="1024px", height="768px"))
+        .add(chart=l1, grid_opts=opts.GridOpts(pos_left=50, pos_right=50, height="35%"))
+        .add(chart=l2,grid_opts=opts.GridOpts(pos_left=50, pos_right=50, pos_top="55%", height="35%"))
+        .render("load_forecast_Ampds.html")
+)
 
-    loss_mean = np.mean(loss, axis=0)
-    loss_std = np.std(loss, axis=0)
-    loss_up = loss_mean + loss_std
-    loss_down = loss_mean - loss_std
+webbrowser.open("load_forecast_Ampds.html", new=1)
 
-    val_loss_mean = np.mean(val_loss, axis=0)
-    val_loss_std = np.std(val_loss, axis=0)
-    val_loss_up = val_loss_mean + val_loss_std
-    val_loss_down = val_loss_mean - val_loss_std
-
-    x = range(1000)
-
-    plt.figure(figsize=(5, 4))
-    plt.plot(x, loss_mean, color='Green')
-    plt.fill_between(x, loss_up, loss_down, color='LightGreen', alpha=0.7)
-    plt.plot(val_loss_mean, color='RoyalBlue')
-    plt.fill_between(x, val_loss_up, val_loss_down, color='LightSkyBlue', alpha=0.7)
-    plt.axis([200, 1000, 1, 2.5])
-    plt.show()
-else:
-
-    def get_curve_data(history):
-        loss = []
-        for history_item in history:
-            loss = loss + history_item.history['loss']
-        return (np.array(loss))
-
-
-    loss_list = []
-    for history in history_list:
-        loss_once = get_curve_data(history)
-        loss_list.append(loss_once)
-
-    print(history_list)
-
-    loss = np.array(loss_list)
-
-    loss_mean = np.mean(loss, axis=0)
-    loss_std = np.std(loss, axis=0)
-    loss_up = loss_mean + loss_std
-    loss_down = loss_mean - loss_std
-
-    x = range(1000)
-
-    plt.figure(figsize=(5, 4))
-    plt.plot(x, loss_mean, color='Green')
-    plt.fill_between(x, loss_up, loss_down, color='LightGreen', alpha=0.7)
-    plt.axis([200, 1000, 1, 2.5])
-    plt.show()
+# VAL = False  # only used for the plotting section hereafter
+# # You can set the proportion of validation data in the training phase
+# # or split the data into training and validation sets in advance
+#
+# if VAL:
+#     def get_curve_data(history):
+#         loss = []
+#         val_loss = []
+#         for history_item in history:
+#             loss = loss + history_item.history['loss']
+#             val_loss = val_loss + history_item.history['val_loss']
+#         return (np.array(loss), np.array(val_loss))
+#
+#
+#     loss_list = []
+#     val_loss_list = []
+#     for history in history_list:
+#         loss_once, val_loss_once = get_curve_data(history)
+#         loss_list.append(loss_once)
+#         val_loss_list.append(val_loss_once)
+#
+#     loss = np.array(loss_list)
+#     val_loss = np.array(val_loss_list)
+#
+#     loss_mean = np.mean(loss, axis=0)
+#     loss_std = np.std(loss, axis=0)
+#     loss_up = loss_mean + loss_std
+#     loss_down = loss_mean - loss_std
+#
+#     val_loss_mean = np.mean(val_loss, axis=0)
+#     val_loss_std = np.std(val_loss, axis=0)
+#     val_loss_up = val_loss_mean + val_loss_std
+#     val_loss_down = val_loss_mean - val_loss_std
+#
+#     x = range(1000)
+#
+#     plt.figure(figsize=(5, 4))
+#     plt.plot(x, loss_mean, color='Green')
+#     plt.fill_between(x, loss_up, loss_down, color='LightGreen', alpha=0.7)
+#     plt.plot(val_loss_mean, color='RoyalBlue')
+#     plt.fill_between(x, val_loss_up, val_loss_down, color='LightSkyBlue', alpha=0.7)
+#     plt.axis([200, 700, 1, 2.5])
+#     plt.show()
+# else:
+#
+#     def get_curve_data(history):
+#         loss = []
+#         for history_item in history:
+#             loss = loss + history_item.history['loss']
+#         return (np.array(loss))
+#
+#
+#     loss_list = []
+#     for history in history_list:
+#         loss_once = get_curve_data(history)
+#         loss_list.append(loss_once)
+#
+#     print(history_list)
+#
+#     loss = np.array(loss_list)
+#
+#     loss_mean = np.mean(loss, axis=0)
+#     loss_std = np.std(loss, axis=0)
+#     loss_up = loss_mean + loss_std
+#     loss_down = loss_mean - loss_std
+#
+#     x = range(700)
+#
+#     plt.figure(figsize=(5, 4))
+#     plt.plot(x, loss_mean, color='Green')
+#     plt.fill_between(x, loss_up, loss_down, color='LightGreen', alpha=0.7)
+#     plt.axis([200, 700, 1, 2.5])
+#     plt.show()
